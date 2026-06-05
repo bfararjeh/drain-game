@@ -5,6 +5,8 @@ export default function Home() {
       <a href="/game" >Play</a>
       <br/>
       <a href="/about" >About</a>
+      <br/>
+      <a href="/editor" >Editor</a>
     </main>
   )
 }
