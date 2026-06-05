@@ -3,9 +3,13 @@ import { useState } from "react"
 import { Tile, TileType } from "@/src/types"
 
 export default function Editor() {
+  const [gridSize, setGridSize] = useState(3)
   const [grid, setGrid] = useState<Tile[][]>(
-    Array(3).fill(null).map(() => Array(3).fill({ type: "blocked" as TileType }))
+      Array(gridSize).fill(null).map(() => Array(gridSize).fill({ type: "blocked" as TileType }))
   )
+  const TILE_SIZE = 100
+  const GAP = 25
+
   const [selectedTile, setSelectedTile] = useState<number[] | null>(null)
   const [drainTarget, setDrainTarget] = useState<number>(0)
 
@@ -77,6 +81,12 @@ export default function Editor() {
     if (tile.type === "amp_global") return `x${tile.value} all`
     return ""
   }
+
+  function handleGridResize(newSize: number) {
+    setGridSize(newSize)
+    setGrid(Array(newSize).fill(null).map(() => Array(newSize).fill({ type: "blocked" as TileType })))
+    setSelectedTile(null)
+  }
   
   return (
     <main>
@@ -85,7 +95,14 @@ export default function Editor() {
       <br /><br />
 
       {/* Grid */}
-      <div className="grid">
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${gridSize}, ${TILE_SIZE}px)`,
+          gridTemplateRows: `repeat(${gridSize}, ${TILE_SIZE}px)`,
+          gap: `${GAP}px`
+        }}
+      >
         {grid.flatMap((row, rowIndex) =>
           row.map((tile, colIndex) => (
             <div
@@ -151,6 +168,17 @@ export default function Editor() {
         Copy to Clipboard
       </button>
       <br /><br />
+
+      <label>
+          Grid Size:&nbsp;
+          <input
+              type="number"
+              min={2}
+              max={6}
+              value={gridSize}
+              onChange={(e) => handleGridResize(Number(e.target.value))}
+          />
+      </label>
 
       {/* Export output */}
       <pre style={{
