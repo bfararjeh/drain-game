@@ -11,7 +11,7 @@ export default function About() {
             <br/><br/>
             Built over a few days as a personal project, I used this web-app to experiment and learn TypeScript in a practical context, get some familiarity with the whole web-app design and development process, and lastly bring life to an idea I was sitting on. This site is built almost exclusively in Next.js and TypeScript, with plain CSS for styling, and is hosted on Vercel.
             <br/><br/>
-            The game has plenty of room to grow, while the current list of mechanics are small, the ideas were endless. Cells that retroactively affected other cells, cells that transported you to other cells, or simply cells you needed to pass through; the core idea is fun and understandable enough to allow much versatility.
+            The game has plenty of room to grow, while the current list of mechanics are small, the ideas were endless. Cells that retroactively affect other cells, cells that transported you to other cells, or simply cells you needed to pass through; the core idea is fun and understandable enough to allow much versatility.
             <br/><br/>
           </p>
         </div>
