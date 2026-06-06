@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation"
 import { initAudio } from "@/src/audio"
 
 export default function Home() {
-  const router = useRouter()
+	const router = useRouter()
 	const [holdProgress, setHoldProgress] = useState(0)
 	const holdInterval = useRef<NodeJS.Timeout | null>(null)
 
 	useEffect(() => {
     if (holdProgress >= 100) {
-        router.push("/game")
+        router.push("/levels")
 		initAudio()
     }
 	}, [holdProgress])

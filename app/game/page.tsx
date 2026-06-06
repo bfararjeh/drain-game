@@ -1,15 +1,30 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { puzzles } from "@/src/puzzles"
 import { Tile } from "@/src/types"
-import { initAudio, playPing, playWin, playLose, playButton, playReset, toggleMusic, toggleSfx } from "@/src/audio"
+import { playPing, playWin, playLose, playButton, playReset, toggleMusic, toggleSfx, initAudio } from "@/src/audio"
+import { saveProgress } from "@/src/progress"
+import { useRouter } from "next/navigation"
 
 export default function Game() {
 
-  // const variabls
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [puzzleIndex, setPuzzleIndex] = useState(0)
+  useEffect(() => {
+      const level = searchParams.get("level")
+      if (level === null) {
+          router.push("/levels")
+          return
+      }
+      setPuzzleIndex(parseInt(level))
+  }, [searchParams])
+
+  const initialLevel = parseInt(searchParams.get("level") ?? "0")
+  const [puzzleIndex, setPuzzleIndex] = useState(initialLevel)
+
   const [playedTiles, setPlayedTiles] = useState<number[][]>([])
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">("playing")
   const [score, setScore] = useState<number | null>(null)
@@ -61,6 +76,7 @@ export default function Game() {
   }
 
   function handleTileClick(rowIndex: number, colIndex: number) {
+    initAudio()
     const position = [rowIndex, colIndex]
     const currentTile = grid[rowIndex][colIndex]
     const lastPlayed = playedTiles[playedTiles.length - 1]
@@ -138,10 +154,11 @@ export default function Game() {
 
   function handleNext() {
     if (puzzleIndex < puzzles.length - 1) {
-        setPuzzleIndex(puzzleIndex + 1)
-        handleReset()
+      saveProgress(puzzleIndex + 2)
+      handleReset()
+      router.push(`/game?level=${puzzleIndex + 1}`)
     } else {
-        console.log("No more puzzles!")
+      router.push("/levels")
     }
   }
 
@@ -308,6 +325,11 @@ export default function Game() {
   return (
     <main>
       <div className="title">SurgeCap</div>
+      <button
+      onClick={() => router.push("/levels")}
+      className="game-button-option">
+        Back
+      </button>
         <div className="game-container">
           <div className="battery-wrapper">
             <p>{animatedTotal} / {puzzle.charge_target}</p>

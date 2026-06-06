@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Google_Sans_Flex, JetBrains_Mono, Orbitron } from "next/font/google"
-import Sparks from "@/app/components/Sparks"
+import Sparks from "@/src/components/Sparks"
 import "./globals.css";
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
