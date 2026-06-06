@@ -1,7 +1,8 @@
-export type TileType = 
+export type TileType =
   | "charge"
   | "amp_next"
   | "amp_global"
+  | "polarity"
   | "blocked"
 
 export interface Tile {

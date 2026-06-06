@@ -1,18 +1,48 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
+import { Suspense } from "react"
+
 import { puzzles } from "@/src/puzzles"
 import { Tile } from "@/src/types"
-import { playPing, playWin, playLose, playButton, playReset, toggleMusic, toggleSfx, initAudio } from "@/src/audio"
 import { saveProgress } from "@/src/progress"
-import { useRouter } from "next/navigation"
-import { Suspense } from "react"
+import { playPing, playWin, playLose, playButton, playReset, toggleMusic, toggleSfx, initAudio } from "@/src/audio"
+
+const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost"
 
 function Game() {
 
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  const [puzzleIndex, setPuzzleIndex] = useState(parseInt(searchParams.get("level") ?? "0"))
+  const [playedTiles, setPlayedTiles] = useState<number[][]>([])
+  const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">("playing")
+  const [score, setScore] = useState<number | null>(null)
+  const [tileSize, setTileSize] = useState(100)
+  const [currentStep, setCurrentStep] = useState<number | null>(null)
+  const [displayTotal, setDisplayTotal] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [animatedTotal, setAnimatedTotal] = useState(0)
+  const [musicMuted, setMusicMuted] = useState(false)
+  const [sfxMuted, setSfxMuted] = useState(false)
+  const [solverOpen, setSolverOpen] = useState(false)
+  const [solutions, setSolutions] = useState<number[][][] | null>(null)
+  const [solverIndex, setSolverIndex] = useState(0)
+
+  const animationRef = useRef<number | null>(null)
+
+  const puzzle = puzzles[puzzleIndex]
+  const grid = puzzle.grid
+  const gridSize = puzzle.grid.length
+  const GAP = 25
+  const svgSize = gridSize * tileSize + (gridSize - 1) * GAP
+
+  const solverHighlight = solverOpen && solutions && solutions[solverIndex]
+  ? new Set(solutions[solverIndex].map(([r, c]) => `${r}-${c}`))
+  : null
+
 
   useEffect(() => {
       const level = searchParams.get("level")
@@ -23,51 +53,153 @@ function Game() {
       setPuzzleIndex(parseInt(level))
   }, [searchParams])
 
-  const initialLevel = parseInt(searchParams.get("level") ?? "0")
-  const [puzzleIndex, setPuzzleIndex] = useState(initialLevel)
-
-  const [playedTiles, setPlayedTiles] = useState<number[][]>([])
-  const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">("playing")
-  const [score, setScore] = useState<number | null>(null)
-
-  const puzzle = puzzles[puzzleIndex]
-  const grid = puzzle.grid
-  const gridSize = puzzle.grid.length
-
-  const [tileSize, setTileSize] = useState(100)
-  const GAP = 25
-  
-  useEffect(() => { // constant check tilesie
+  useEffect(() => {
     function calculate() {
-        setTileSize(Math.min(100, Math.floor((window.innerWidth * 0.8) / gridSize)))
+      setTileSize(Math.min(100, Math.floor((window.innerWidth * 0.8) / gridSize)))
     }
     calculate()
     window.addEventListener("resize", calculate)
     return () => window.removeEventListener("resize", calculate)
   }, [gridSize])
-  
-  const svgSize = gridSize * tileSize + (gridSize - 1) * GAP
 
-  const [currentStep, setCurrentStep] = useState<number | null>(null)
-  const [displayTotal, setDisplayTotal] = useState(0)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [animatedTotal, setAnimatedTotal] = useState(0)
-  const animationRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isLocalhost) return
+    function onKey(e: KeyboardEvent) {
+      if (e.shiftKey && e.key === "S") {
+        setSolverOpen(o => {
+          if (!o) {
+            setSolutions(null)
+            setSolverIndex(0)
+            setTimeout(() => {
+              setSolutions(findAllSolutions(puzzle.grid, puzzle.charge_target))
+            }, 0)
+          }
+          return !o
+        })
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [puzzle])
 
-  const playground = grid.flatMap((row, rowIndex) =>
-    row.map((tile, colIndex) =>
-      <div
-      key={`${rowIndex}-${colIndex}`}
-      className={getTileClass(rowIndex, colIndex)}
-      onClick={() => handleTileClick(rowIndex, colIndex)}
-      >
-        {getTileDisplay(tile)}
-      </div>
-    )
-  )
+ useEffect(() => {
+      if (currentStep === null) return
+      if (currentStep >= playedTiles.length) {
+          const total = calculateTotal(playedTiles)
+          setScore(total)
+          if (total === puzzle.charge_target) {
+              setGameStatus("won")
+              playWin()
+          } else {
+              setGameStatus("lost")
+              playLose()
+          }
+          setIsAnimating(false)
+          setCurrentStep(null)
+          return
+      }
+      setDisplayTotal(calculateTotal(playedTiles.slice(0, currentStep + 1)))
+      playPing(currentStep, playedTiles.length)
+      const timer = setTimeout(() => {
+        setCurrentStep(prev => prev !== null ? prev + 1 : null)
+      }, 500)
+      return () => clearTimeout(timer)
+  }, [currentStep])
 
-  const [musicMuted, setMusicMuted] = useState(false)
-  const [sfxMuted, setSfxMuted] = useState(false)
+  useEffect(() => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      
+      const startValue = animatedTotal
+      const endValue = displayTotal
+      const duration = 350
+      const startTime = performance.now()
+
+      function animate(now: number) {
+          const elapsed = now - startTime
+          const progress = Math.min(elapsed / duration, 1)
+          // logarithmic easing — fast start, slow finish
+          const eased = 1 - Math.pow(1 - progress, 3)
+          const current = Math.round(startValue + (endValue - startValue) * eased)
+          setAnimatedTotal(current)
+          if (progress < 1) {
+              animationRef.current = requestAnimationFrame(animate)
+          }
+      }
+
+      animationRef.current = requestAnimationFrame(animate)
+      return () => {
+          if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      }
+  }, [displayTotal])
+
+
+  // solver
+
+  function findAllSolutions(g: Tile[][], target: number): number[][][] {
+    const rows = g.length
+    const cols = g[0].length
+    const found: number[][][] = []
+    const vis = Array.from({ length: rows }, () => new Array(cols).fill(false))
+
+    function hasMove(r: number, c: number): boolean {
+      for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nr = r+dr, nc = c+dc
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !vis[nr][nc] && g[nr][nc].type !== "blocked") return true
+      }
+      return false
+    }
+
+    function score(path: number[][]): number {
+      let total = 0, mult: number | undefined, pol = 1
+      for (const [r, c] of path) {
+        const t = g[r][c]
+        if (t.type === "charge" && t.value !== undefined) {
+          total += (mult !== undefined ? t.value * mult : t.value) * pol
+          mult = undefined
+        } else if (t.type === "amp_next" && t.value !== undefined) {
+          mult = t.value
+        } else if (t.type === "amp_global" && t.value !== undefined) {
+          total *= t.value
+        } else if (t.type === "polarity") {
+          pol *= -1
+        }
+      }
+      return total
+    }
+
+    function dfs(r: number, c: number, path: number[][]) {
+      if (found.length >= 500) return
+      vis[r][c] = true
+      path.push([r, c])
+      if (!hasMove(r, c)) {
+        if (score(path) === target) found.push(path.map(p => [...p]))
+      } else {
+        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+          const nr = r+dr, nc = c+dc
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !vis[nr][nc] && g[nr][nc].type !== "blocked")
+            dfs(nr, nc, path)
+        }
+      }
+      path.pop()
+      vis[r][c] = false
+    }
+
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        if (g[r][c].type !== "blocked") dfs(r, c, [])
+
+    // deduplicate: a path walked in reverse is the same route
+    const seen = new Set<string>()
+    return found.filter(path => {
+      const fwd = path.map(([r, c]) => `${r},${c}`).join("|")
+      const rev = [...path].reverse().map(([r, c]) => `${r},${c}`).join("|")
+      const key = fwd < rev ? fwd : rev
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
 
   // game logic
 
@@ -172,17 +304,17 @@ function Game() {
       if (tile.type === "charge") bgClass = "tile-charge"
       if (tile.type === "amp_next") bgClass = "tile-next-amp"
       if (tile.type === "amp_global") bgClass = "tile-global-amp"
+      if (tile.type === "polarity") bgClass = "tile-polarity"
 
       let stateClass = ""
 
-      if (currentStep !== null && playedTiles.slice(0, currentStep + 1).some(p => p[0] === rowIndex && p[1] === colIndex)) {
-          // during animation — yellow up to current step
+      if (solverHighlight?.has(`${rowIndex}-${colIndex}`)) {
+          stateClass = "tile-animating"
+      } else if (currentStep !== null && playedTiles.slice(0, currentStep + 1).some(p => p[0] === rowIndex && p[1] === colIndex)) {
           stateClass = "tile-animating"
       } else if (gameStatus !== "playing" && playedTiles.some(p => p[0] === rowIndex && p[1] === colIndex)) {
-          // after animation — keep whole path yellow
           stateClass = "tile-animating"
       } else if (!isAnimating && lastPlayed && lastPlayed[0] === rowIndex && lastPlayed[1] === colIndex) {
-          // normal play — highlight last played
           stateClass = "tile-recent"
       } else if (playedTiles.some(p => p[0] === rowIndex && p[1] === colIndex)) {
           stateClass = "tile-played"
@@ -197,6 +329,7 @@ function Game() {
       if (tile.type === "charge") return `${tile.value}`
       if (tile.type === "amp_next") return `x${tile.value} next`
       if (tile.type === "amp_global") return `x${tile.value} all`
+      if (tile.type === "polarity") return `Flip Current`
       return ""
   }
   
@@ -210,76 +343,23 @@ function Game() {
 
   // submit + animation
 
-  useEffect(() => {
-      if (currentStep === null) return
-      if (currentStep >= playedTiles.length) {
-          const total = calculateTotal(playedTiles)
-          setScore(total)
-          if (total === puzzle.charge_target) {
-              setGameStatus("won")
-              playWin()
-          } else {
-              setGameStatus("lost")
-              playLose()
-          }
-          setIsAnimating(false)
-          setCurrentStep(null)
-          return
-      }
-      setDisplayTotal(calculateTotal(playedTiles.slice(0, currentStep + 1)))
-      playPing(currentStep)
-      const timer = setTimeout(() => {
-        setCurrentStep(prev => prev !== null ? prev + 1 : null)
-      }, 500)
-      return () => clearTimeout(timer)
-  }, [currentStep])
-
-  useEffect(() => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      
-      const startValue = animatedTotal
-      const endValue = displayTotal
-      const duration = 350
-      const startTime = performance.now()
-
-      function animate(now: number) {
-          const elapsed = now - startTime
-          const progress = Math.min(elapsed / duration, 1)
-          // logarithmic easing — fast start, slow finish
-          const eased = 1 - Math.pow(1 - progress, 3)
-          const current = Math.round(startValue + (endValue - startValue) * eased)
-          setAnimatedTotal(current)
-          if (progress < 1) {
-              animationRef.current = requestAnimationFrame(animate)
-          }
-      }
-
-      animationRef.current = requestAnimationFrame(animate)
-      return () => {
-          if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      }
-  }, [displayTotal])
-
-
   function calculateTotal(positions: number[][]): number {
       let total = 0
       let multiplier: number | undefined = undefined
+      let polarity = 1
       for (const position of positions) {
           const [row, col] = position
           const tile = grid[row][col]
           if (tile.type === "charge" && tile.value !== undefined) {
-              if (multiplier !== undefined) {
-                  total += tile.value * multiplier
-                  multiplier = undefined
-              } else {
-                  total += tile.value
-              }
-          }
-          if (tile.type === "amp_next" && tile.value !== undefined) {
+              const effective = multiplier !== undefined ? tile.value * multiplier : tile.value
+              total += effective * polarity
+              multiplier = undefined
+          } else if (tile.type === "amp_next" && tile.value !== undefined) {
               multiplier = tile.value
-          }
-          if (tile.type === "amp_global" && tile.value !== undefined) {
+          } else if (tile.type === "amp_global" && tile.value !== undefined) {
               total *= tile.value
+          } else if (tile.type === "polarity") {
+              polarity *= -1
           }
       }
       return total
@@ -354,10 +434,36 @@ function Game() {
               gap: `${GAP}px`
             }}
             >
-            {playground}
+            {grid.flatMap((row, rowIndex) =>
+              row.map((tile, colIndex) =>
+                <div
+                key={`${rowIndex}-${colIndex}`}
+                className={getTileClass(rowIndex, colIndex)}
+                onClick={() => handleTileClick(rowIndex, colIndex)}
+                >
+                  {getTileDisplay(tile)}
+                </div>
+              )
+            )}
           </div>
 
           <svg width={svgSize} height={svgSize} className="tube-layer">
+            {/* solver path lines */}
+            {solverHighlight && solutions?.[solverIndex]?.slice(0, -1).map((pos, i) => {
+              const sol = solutions[solverIndex]
+              const from = getTileCenter(pos[0], pos[1])
+              const to = getTileCenter(sol[i + 1][0], sol[i + 1][1])
+              return (
+                <line
+                key={`solver-${i}`}
+                x1={from.x} y1={from.y}
+                x2={to.x} y2={to.y}
+                stroke="yellow"
+                strokeWidth="3"
+                className="tube-played"
+                />
+              )
+            })}
             {/* lines showing played moves */}
             {playedTiles.slice(0, -1).map((pos, i) => {
               const from = getTileCenter(pos[0], pos[1])
@@ -439,6 +545,29 @@ function Game() {
             </button>
           </div>
         </div>
+      {isLocalhost && solverOpen && (
+        <div className="solver-overlay">
+          <div className="solver-header">
+            <span>
+              {solutions === null
+                ? "solving…"
+                : solutions.length === 0
+                ? "no solutions"
+                : solutions.length >= 500
+                ? "500+ solutions"
+                : `${solutions.length} solution${solutions.length === 1 ? "" : "s"}`}
+            </span>
+            {solutions && solutions.length > 0 && (
+              <div className="solver-nav">
+                <button onClick={() => setSolverIndex(i => Math.max(0, i - 1))}>◀</button>
+                <span>{solverIndex + 1} / {Math.min(solutions.length, 500)}</span>
+                <button onClick={() => setSolverIndex(i => Math.min((solutions?.length ?? 1) - 1, i + 1))}>▶</button>
+              </div>
+            )}
+            <span className="solver-hint">shift+s to close</span>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

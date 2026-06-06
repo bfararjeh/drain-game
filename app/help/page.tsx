@@ -57,12 +57,13 @@ export default function Rules() {
                     </div>
 
                     <div className="rules-tile-row">
-                        <div className="tile-blocked rules-tile"></div>
+                        <div className="tile-polarity rules-tile">Flip Polarity</div>
                         <div className="rules-tile-desc">
-                            <strong>Blocked</strong>
-                            <p>Cannot be traversed.</p>
+                            <strong>Flip Polarity</strong>
+                            <p>Alternates the current, making everything that charges, drain, and vice-versa.</p>
                         </div>
                     </div>
+
                 </section>
 
                 <section className="rules-section">

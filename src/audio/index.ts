@@ -9,10 +9,12 @@ export async function initAudio() {
     initialized = true
 }
 
-export function playPing(step: number) {
+export function playPing(step: number, pathLength: number) {
     if (sfxMuted) return
-    const scale = ["C4", "E4", "G4", "A4", "C5", "E5", "G5", "A5", "C6", "E6", "G6", "A6", "C7", "E7", "G7", "A7"]
-    const note = scale[Math.min(step, scale.length - 1)]
+    const scale = ["C3", "E3", "G3", "A3", "C4", "E4", "G4", "A4", "C5", "E5", "G5", "A5", "C6", "E6", "G6", "A6"]
+    const preferredStart = 4 // C4
+    const startIndex = Math.min(preferredStart, Math.max(0, scale.length - pathLength))
+    const note = scale[Math.min(startIndex + step, scale.length - 1)]
     const synth = new Tone.Synth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.05, decay: 0.8, sustain: 0.6, release: 2 },
