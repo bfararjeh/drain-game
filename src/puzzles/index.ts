@@ -61,8 +61,8 @@ export const puzzles: Puzzle[] = [
     {
         charge_target: 200,
         grid: [
-            [{type: "amp_next", value: 2}, {type: "blocked"}, {type: "charge", value: 100}],
-            [{type: "charge", value: 50}, {type: "charge", value: 100}, {type: "charge", value: 50}],
+            [{type: "amp_next", value: 2}, {type: "blocked"}, {type: "blocked"}],
+            [{type: "charge", value: 50}, {type: "charge", value: 50}, {type: "charge", value: 50}],
             [{type: "charge", value: 50}, {type: "charge", value: 50}, {type: "amp_next", value: 2}],
         ]
     },
