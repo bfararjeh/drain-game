@@ -3,10 +3,11 @@ import { Puzzle } from "@/src/types"
 const puzzle1: Puzzle = {
     charge_target: 150,
     grid: [
-        [{type: "blocked"}, {type: "blocked"}, {type: "blocked"}],
-        [{type: "charge", value: 50}, {type: "charge", value: 50}, {type: "charge", value: 50}],
-        [{type: "blocked"}, {type: "blocked"}, {type: "blocked"}]
-    ]
+        [{type: "charge", value: 80}, {type: "blocked"}, {type: "charge", value: 80}, {type: "blocked"}],
+        [{type: "charge", value: 80}, {type: "charge", value: 80}, {type: "charge", value: 80}, {type: "blocked"}],
+        [{type: "charge", value: 40}, {type: "charge", value: 20}, {type: "charge", value: 100}, {type: "blocked"}],
+        [{type: "charge", value: 40}, {type: "charge", value: 20}, {type: "charge", value: 100}, {type: "blocked"}]
+  ]
 }
 
 const puzzle2: Puzzle = {

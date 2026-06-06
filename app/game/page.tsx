@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { puzzles } from "@/src/puzzles"
 import { Tile } from "@/src/types"
 
@@ -8,22 +8,35 @@ export default function Game() {
 
   // const variabls
 
-  const TILE_SIZE = 100
-  const GAP = 25
-
   const [puzzleIndex, setPuzzleIndex] = useState(0)
   const [playedTiles, setPlayedTiles] = useState<number[][]>([])
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">("playing")
   const [score, setScore] = useState<number | null>(null)
+
   const puzzle = puzzles[puzzleIndex]
   const grid = puzzle.grid
   const gridSize = puzzle.grid.length
 
-  const svgSize = gridSize * TILE_SIZE + (gridSize - 1) * GAP
+  const [tileSize, setTileSize] = useState(100)
+  const GAP = 25
+
+  // constant check tilesie
+  useEffect(() => {
+    function calculate() {
+        setTileSize(Math.min(100, Math.floor((window.innerWidth * 0.8) / gridSize)))
+    }
+    calculate()
+    window.addEventListener("resize", calculate)
+    return () => window.removeEventListener("resize", calculate)
+  }, [gridSize])
+  
+  const svgSize = gridSize * tileSize + (gridSize - 1) * GAP
 
   const [currentStep, setCurrentStep] = useState<number | null>(null)
   const [displayTotal, setDisplayTotal] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [animatedTotal, setAnimatedTotal] = useState(0)
+  const animationRef = useRef<number | null>(null)
 
   const playground = grid.flatMap((row, rowIndex) =>
     row.map((tile, colIndex) =>
@@ -50,7 +63,7 @@ export default function Game() {
     const currentTile = grid[rowIndex][colIndex]
     const lastPlayed = playedTiles[playedTiles.length - 1]
 
-    if (gameStatus === "won") return
+    if (gameStatus !== "playing") return
 
     // if clicking last played tile, unclick it
     if (lastPlayed && lastPlayed[0] === rowIndex && lastPlayed[1] === colIndex) {
@@ -113,7 +126,11 @@ export default function Game() {
   }
 
   function handleReset() {
+    if (isAnimating) return
     setPlayedTiles([])
+    setDisplayTotal(0)
+    setAnimatedTotal(0)
+    setScore(null)
     setGameStatus("playing")
   }
 
@@ -165,8 +182,8 @@ export default function Game() {
   
   function getTileCenter(row: number, col: number) {
       return {
-          x: col * (TILE_SIZE + GAP) + TILE_SIZE / 2,
-          y: row * (TILE_SIZE + GAP) + TILE_SIZE / 2
+          x: col * (tileSize + GAP) + tileSize / 2,
+          y: row * (tileSize + GAP) + tileSize / 2
       }
   }
 
@@ -189,6 +206,33 @@ export default function Game() {
       }, 500)
       return () => clearTimeout(timer)
   }, [currentStep])
+
+  useEffect(() => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      
+      const startValue = animatedTotal
+      const endValue = displayTotal
+      const duration = 350
+      const startTime = performance.now()
+
+      function animate(now: number) {
+          const elapsed = now - startTime
+          const progress = Math.min(elapsed / duration, 1)
+          // logarithmic easing — fast start, slow finish
+          const eased = 1 - Math.pow(1 - progress, 3)
+          const current = Math.round(startValue + (endValue - startValue) * eased)
+          setAnimatedTotal(current)
+          if (progress < 1) {
+              animationRef.current = requestAnimationFrame(animate)
+          }
+      }
+
+      animationRef.current = requestAnimationFrame(animate)
+      return () => {
+          if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      }
+  }, [displayTotal])
+
 
   function calculateTotal(positions: number[][]): number {
       let total = 0
@@ -221,16 +265,60 @@ export default function Game() {
       setDisplayTotal(0)
   }
 
+  function Battery() {
+      const percent = (animatedTotal / puzzle.charge_target) * 100
+      const clampedPercent = Math.min(percent, 100)
+
+      // 0% = yellow, 100% = cyan-green
+      // beyond 100% shift toward red, capped at 200% 
+      const hue = 60 + (clampedPercent / 100) * 60
+      const overfullProgress = Math.min((percent - 50) / 100, 1)
+      const overfullHue = percent > 100 ? Math.max(0, 120 - (overfullProgress * 120)) : hue
+      const colour = `hsl(${overfullHue}, 90%, 65%)`
+
+      const fillTransform = {
+          transformOrigin: "6px center",
+          transform: `scaleX(${Math.max(0, clampedPercent / 100)})`,
+          transition: "transform 0.3s linear"
+      }
+
+      const colourTransition = { transition: "all 0.3s ease" }
+
+      return (
+          <svg width="200" height="60" viewBox="0 0 95 60">
+              <rect x="2" y="10" width="88" height="40" rx="2" ry="2"
+                  style={{ fill: "transparent", stroke: colour, strokeWidth: 3, ...colourTransition }} />
+              <rect x="90" y="22" width="5" height="16" rx="1" ry="1"
+                  style={{ fill: colour, ...colourTransition }} />
+              <rect x="6" y="14" width="80" height="32" rx="1" ry="1"
+                  style={{ fill: colour, opacity: 0.8, ...fillTransform, ...colourTransition }} />
+          </svg>
+      )
+  }
+
   return (
     <main>
       <div className="title">SurgeCap</div>
         <div className="game-container">
+          <div className="battery-wrapper">
+            <p>{animatedTotal} / {puzzle.charge_target}</p>
+            <Battery />
+              {score !== null && (
+                  <p>
+                      {score === puzzle.charge_target
+                          ? "Charged!"
+                          : score > puzzle.charge_target
+                          ? "Overcharged!"
+                          : "Underpowered!"}
+                  </p>
+              )}
+          </div>
           <div className="grid-wrapper" style={{ width: svgSize, height: svgSize }}>
           <div 
             className="grid"
             style={{ 
-              gridTemplateColumns: `repeat(${gridSize}, ${TILE_SIZE}px)`,
-              gridTemplateRows: `repeat(${gridSize}, ${TILE_SIZE}px)`,
+              gridTemplateColumns: `repeat(${gridSize}, ${tileSize}px)`,
+              gridTemplateRows: `repeat(${gridSize}, ${tileSize}px)`,
               gap: `${GAP}px`
             }}
             >
@@ -285,24 +373,24 @@ export default function Game() {
           })()}
           </svg>
           </div>
-
-          <div className="detail-wrapper">
-            <p>Goal is {puzzle.charge_target}</p>
-            <button 
-              onClick={() => handleSubmit()} 
-              disabled={playedTiles.length === 0 || checkSubmitValidity()}
-              >
-              Charge
-            </button>
-            <button onClick={() => handleReset()}>Reset</button>
-            {gameStatus === "won" && (
-              <button onClick={() => handleNext()}>Next</button>
-            )}
-            {gameStatus === "lost" && (
-              <p>you scored {score} - target was {puzzle.charge_target}</p>
-            )}
-            <p>{gameStatus}</p>
-            <p>Charge: {isAnimating ? displayTotal : score ?? 0}</p>
+          <div style={{ flex: 1 }} />
+          <div className="detail-buttons">
+              <button 
+              onClick={() => handleReset()} 
+              className="game-button-reset" 
+              disabled={isAnimating}>
+                reset
+              </button>
+              {gameStatus === "won"
+                  ? <button onClick={() => handleNext()} className="game-button-next">Next</button>
+                  : <button
+                      onClick={() => handleSubmit()}
+                      disabled={playedTiles.length === 0 || checkSubmitValidity()}
+                      className="game-button-charge"
+                    >
+                      Charge
+                    </button>
+              }
           </div>
         </div>
     </main>
