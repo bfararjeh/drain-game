@@ -4,7 +4,7 @@ import { Tile, TileType } from "@/src/types"
 
 const TILE_SIZE = 100
 const GAP = 25
-const TILE_TYPES: TileType[] = ["blocked", "drain", "amp_next", "amp_global"]
+const TILE_TYPES: TileType[] = ["blocked", "charge", "amp_next", "amp_global"]
 
 export default function Editor() {
 
@@ -13,7 +13,7 @@ export default function Editor() {
   )
   const [gridSize, setGridSize] = useState(3)
   const [selectedTile, setSelectedTile] = useState<number[] | null>(null)
-  const [drainTarget, setDrainTarget] = useState<number>(0)
+  const [chargeTarget, setchargeTarget] = useState<number>(0)
   const selectedTileData = selectedTile ? grid[selectedTile[0]][selectedTile[1]] : null
 
   function handleTileClick(rowIndex: number, colIndex: number) {
@@ -37,7 +37,7 @@ export default function Editor() {
   function handleReset() {
     setGrid(Array(gridSize).fill(null).map(() => Array(gridSize).fill({ type: "blocked" as TileType })))
     setSelectedTile(null)
-    setDrainTarget(0)
+    setchargeTarget(0)
   }
 
   function handleGridResize(newSize: number) {
@@ -50,7 +50,7 @@ export default function Editor() {
     const tile = grid[rowIndex][colIndex]
     const bgClass =
       tile.type === "blocked" ? "tile-blocked" :
-      tile.type === "drain" ? "tile-drain" :
+      tile.type === "charge" ? "tile-charge" :
       tile.type === "amp_next" ? "tile-next-amp" :
       "tile-global-amp"
     const isSelected = selectedTile?.[0] === rowIndex && selectedTile?.[1] === colIndex
@@ -58,7 +58,7 @@ export default function Editor() {
   }
 
   function getTileDisplay(tile: Tile): string {
-    if (tile.type === "drain") return `${tile.value ?? ""}`
+    if (tile.type === "charge") return `${tile.value ?? ""}`
     if (tile.type === "amp_next") return `x${tile.value ?? "?"} next`
     if (tile.type === "amp_global") return `x${tile.value ?? "?"} all`
     return ""
@@ -73,7 +73,7 @@ export default function Editor() {
       }).join(", ")}]`
     ).join(",\n        ")
     return `{
-  drain_target: ${drainTarget},
+  charge_target: ${chargeTarget},
   grid: [
         ${gridString}
   ]
@@ -111,9 +111,9 @@ export default function Editor() {
       <br />
 
       {/* Controls */}
-      <label>Drain Target:&nbsp;
-        <input type="number" value={drainTarget}
-          onChange={(e) => setDrainTarget(Number(e.target.value))} />
+      <label>charge Target:&nbsp;
+        <input type="number" value={chargeTarget}
+          onChange={(e) => setchargeTarget(Number(e.target.value))} />
       </label>
       &nbsp;&nbsp;
       <label>Grid Size:&nbsp;
