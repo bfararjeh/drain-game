@@ -101,7 +101,7 @@ export const puzzles: Puzzle[] = [
         ]
     },
     {//level 13
-        charge_target: 150,
+        charge_target: 125,
         grid: [
             [{type: "charge", value: 25}, {type: "amp_next", value: 2},  {type: "charge", value: 30}],
             [{type: "charge", value: 10},  {type: "blocked"}, {type: "charge", value: 5}],
