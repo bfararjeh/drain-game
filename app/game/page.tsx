@@ -13,6 +13,8 @@ const isLocalhost = typeof window !== "undefined" && window.location.hostname ==
 
 function Game() {
 
+  // vars
+
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -43,6 +45,8 @@ function Game() {
   ? new Set(solutions[solverIndex].map(([r, c]) => `${r}-${c}`))
   : null
 
+
+  // animation/visual stuff
 
   useEffect(() => {
       const level = searchParams.get("level")
@@ -322,7 +326,12 @@ function Game() {
           stateClass = "tile-valid"
       }
 
-      return `${bgClass} ${stateClass}`.trim()
+      const tileIndex = playedTiles.findIndex(p => p[0] === rowIndex && p[1] === colIndex)
+      const polarityFlipped = tileIndex !== -1
+          ? isPolarityFlippedAt(tileIndex)
+          : false
+
+      return `${bgClass} ${stateClass} ${polarityFlipped ? "tiles-flipped" : ""}`.trim()
   }
 
   function getTileDisplay(tile: Tile): string {
@@ -342,6 +351,12 @@ function Game() {
 
 
   // submit + animation
+
+  function isPolarityFlippedAt(upToIndex: number): boolean {
+      return playedTiles.slice(0, upToIndex).filter(p =>
+          grid[p[0]][p[1]].type === "polarity"
+      ).length % 2 === 1
+  }
 
   function calculateTotal(positions: number[][]): number {
       let total = 0
@@ -406,17 +421,13 @@ function Game() {
   return (
     <main>
       <div className="title">SurgeCap</div>
-      <button
-      onClick={() => router.push("/levels")}
-      className="game-button-option">
-        Back
-      </button>
         <div className="game-container">
           <div className="battery-wrapper">
-            <p>{animatedTotal} / {puzzle.charge_target}</p>
-            <Battery />
+            <div>
+              <p>{animatedTotal} / {puzzle.charge_target}</p>
+              <Battery />
               {score !== null && (
-                  <p>
+                <p>
                       {score === puzzle.charge_target
                           ? "Charged!"
                           : score > puzzle.charge_target
@@ -424,101 +435,8 @@ function Game() {
                           : "Underpowered!"}
                   </p>
               )}
-          </div>
-          <div className="grid-wrapper" style={{ width: svgSize, height: svgSize }}>
-          <div 
-            className="grid"
-            style={{ 
-              gridTemplateColumns: `repeat(${gridSize}, ${tileSize}px)`,
-              gridTemplateRows: `repeat(${gridSize}, ${tileSize}px)`,
-              gap: `${GAP}px`
-            }}
-            >
-            {grid.flatMap((row, rowIndex) =>
-              row.map((tile, colIndex) =>
-                <div
-                key={`${rowIndex}-${colIndex}`}
-                className={getTileClass(rowIndex, colIndex)}
-                onClick={() => handleTileClick(rowIndex, colIndex)}
-                >
-                  {getTileDisplay(tile)}
-                </div>
-              )
-            )}
-          </div>
-
-          <svg width={svgSize} height={svgSize} className="tube-layer">
-            {/* solver path lines */}
-            {solverHighlight && solutions?.[solverIndex]?.slice(0, -1).map((pos, i) => {
-              const sol = solutions[solverIndex]
-              const from = getTileCenter(pos[0], pos[1])
-              const to = getTileCenter(sol[i + 1][0], sol[i + 1][1])
-              return (
-                <line
-                key={`solver-${i}`}
-                x1={from.x} y1={from.y}
-                x2={to.x} y2={to.y}
-                stroke="yellow"
-                strokeWidth="3"
-                className="tube-played"
-                />
-              )
-            })}
-            {/* lines showing played moves */}
-            {playedTiles.slice(0, -1).map((pos, i) => {
-              const from = getTileCenter(pos[0], pos[1])
-              const to = getTileCenter(playedTiles[i + 1][0], playedTiles[i + 1][1])
-              return (
-                <line
-                key={`played-${i}`}
-                x1={from.x} y1={from.y}
-                x2={to.x} y2={to.y}
-                stroke="yellow"
-                strokeWidth="3"
-                className="tube-played"
-                />
-              )
-            })}
-            {/* lines showing valid moves */}
-            {playedTiles.length > 0 && (() => {
-              const lastPlayed = playedTiles[playedTiles.length - 1]
-              const neighbours = [
-                [lastPlayed[0]-1, lastPlayed[1]],
-                [lastPlayed[0]+1, lastPlayed[1]],
-                [lastPlayed[0], lastPlayed[1]-1],
-                [lastPlayed[0], lastPlayed[1]+1]
-              ]
-              return neighbours
-              .filter(([row, col]) => 
-                row >= 0 && row < gridSize &&
-              col >= 0 && col < gridSize &&
-              isValidNextMove(row, col)
-            )
-            .map(([row, col], i) => {
-              const from = getTileCenter(lastPlayed[0], lastPlayed[1])
-              const to = getTileCenter(row, col)
-              return (
-                <line
-                key={`valid-${i}`}
-                x1={from.x} y1={from.y}
-                x2={to.x} y2={to.y}
-                stroke="cyan"
-                strokeWidth="3"
-                className="tube-valid"
-                />
-              )
-            })
-          })()}
-          </svg>
-          </div>
-          <div style={{ flex: 1 }} />
-          <div className="detail-buttons">
-              <button 
-              onClick={() => handleReset()} 
-              className="game-button-reset" 
-              disabled={isAnimating}>
-                reset
-              </button>
+            </div>
+            <div className="detail-buttons controls-mobile">
               {gameStatus === "won"
                   ? <button onClick={() => handleNext()} className="game-button-next">Next</button>
                   : <button
@@ -529,20 +447,138 @@ function Game() {
                       Charge
                     </button>
               }
+                <button 
+                onClick={() => handleReset()} 
+                className="game-button-reset" 
+                disabled={isAnimating}>
+                  reset
+                </button>
+            </div>
           </div>
-          <div className="detail-buttons">
-            <button
-                onClick={() => setMusicMuted(toggleMusic())}
-                className="game-button-option"
-                >
-                {musicMuted ? "♪ off" : "♪ on"}
-            </button>
-            <button
-                onClick={() => setSfxMuted(toggleSfx())}
-                className="game-button-option"
-                >
-                {sfxMuted ? "sfx off" : "sfx on"}
-            </button>
+          <div className="grid-wrapper" style={{ width: svgSize, height: svgSize + 26 }}>
+            <p className="level-label">Level {puzzleIndex + 1}</p>
+            <div 
+              className="grid"
+              style={{ 
+                gridTemplateColumns: `repeat(${gridSize}, ${tileSize}px)`,
+                gridTemplateRows: `repeat(${gridSize}, ${tileSize}px)`,
+                gap: `${GAP}px`
+              }}
+              >
+              {grid.flatMap((row, rowIndex) =>
+                row.map((tile, colIndex) =>
+                  <div
+                  key={`${rowIndex}-${colIndex}`}
+                  className={getTileClass(rowIndex, colIndex)}
+                  onClick={() => handleTileClick(rowIndex, colIndex)}
+                  >
+                    {getTileDisplay(tile)}
+                  </div>
+                )
+              )}
+            </div>
+            <svg width={svgSize} height={svgSize} className="tube-layer">
+              {/* solver path lines */}
+              {solverHighlight && solutions?.[solverIndex]?.slice(0, -1).map((pos, i) => {
+                const sol = solutions[solverIndex]
+                const from = getTileCenter(pos[0], pos[1])
+                const to = getTileCenter(sol[i + 1][0], sol[i + 1][1])
+                return (
+                  <line
+                  key={`solver-${i}`}
+                  x1={from.x} y1={from.y}
+                  x2={to.x} y2={to.y}
+                  stroke="yellow"
+                  strokeWidth="3"
+                  className="tube-played"
+                  />
+                )
+              })}
+              {/* lines showing played moves */}
+              {playedTiles.slice(0, -1).map((pos, i) => {
+                const from = getTileCenter(pos[0], pos[1])
+                const to = getTileCenter(playedTiles[i + 1][0], playedTiles[i + 1][1])
+                return (
+                  <line
+                  key={`played-${i}`}
+                  x1={from.x} y1={from.y}
+                  x2={to.x} y2={to.y}
+                  stroke="yellow"
+                  strokeWidth="3"
+                  className="tube-played"
+                  />
+                )
+              })}
+              {/* lines showing valid moves */}
+              {playedTiles.length > 0 && (() => {
+                const lastPlayed = playedTiles[playedTiles.length - 1]
+                const neighbours = [
+                  [lastPlayed[0]-1, lastPlayed[1]],
+                  [lastPlayed[0]+1, lastPlayed[1]],
+                  [lastPlayed[0], lastPlayed[1]-1],
+                  [lastPlayed[0], lastPlayed[1]+1]
+                ]
+                return neighbours
+                .filter(([row, col]) => 
+                  row >= 0 && row < gridSize &&
+                col >= 0 && col < gridSize &&
+                isValidNextMove(row, col)
+              )
+              .map(([row, col], i) => {
+                const from = getTileCenter(lastPlayed[0], lastPlayed[1])
+                const to = getTileCenter(row, col)
+                return (
+                  <line
+                  key={`valid-${i}`}
+                  x1={from.x} y1={from.y}
+                  x2={to.x} y2={to.y}
+                  stroke="cyan"
+                  strokeWidth="3"
+                  className="tube-valid"
+                  />
+                )
+              })
+            })()}
+            </svg>
+          </div>
+          <div className="detail-wrapper">
+            <div className="detail-buttons controls">
+                <button 
+                onClick={() => handleReset()} 
+                className="game-button-reset" 
+                disabled={isAnimating}>
+                  reset
+                </button>
+                {gameStatus === "won"
+                    ? <button onClick={() => handleNext()} className="game-button-next">Next</button>
+                    : <button
+                        onClick={() => handleSubmit()}
+                        disabled={playedTiles.length === 0 || checkSubmitValidity() || isAnimating || gameStatus !== "playing"}
+                        className="game-button-charge"
+                      >
+                        Charge
+                      </button>
+                }
+            </div>
+            <div className="detail-buttons">
+              <button
+                  onClick={() => setMusicMuted(toggleMusic())}
+                  className="game-button-option"
+                  >
+                  {musicMuted ? "♪ off" : "♪ on"}
+              </button>
+              <button
+                  onClick={() => setSfxMuted(toggleSfx())}
+                  className="game-button-option"
+                  >
+                  {sfxMuted ? "sfx off" : "sfx on"}
+              </button>
+              <button
+              onClick={() => router.push("/levels")}
+              className="game-button-option">
+                Back
+              </button>
+            </div>
           </div>
         </div>
       {isLocalhost && solverOpen && (

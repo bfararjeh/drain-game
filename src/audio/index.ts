@@ -18,7 +18,7 @@ export function playPing(step: number, pathLength: number) {
     const synth = new Tone.Synth({
         oscillator: { type: "sine" },
         envelope: { attack: 0.05, decay: 0.8, sustain: 0.6, release: 2 },
-        volume: -12
+        volume: -16
     }).toDestination()
     synth.triggerAttackRelease(note, "2n")
 }
